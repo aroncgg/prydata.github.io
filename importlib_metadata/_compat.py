@@ -1,8 +1,17 @@
-import sys
+import os
 import platform
+import sys
+
+from typing import Union
+
+__all__ = ["install", "NullFinder", "Protocol"]
 
 
-__all__ = ['install', 'NullFinder']
+try:
+    from typing import Protocol
+except ImportError:  # pragma: no cover
+    # Python 3.7 compatibility
+    from typing_extensions import Protocol  # type: ignore
 
 
 def install(cls):
@@ -29,8 +38,8 @@ def disable_stdlib_finder():
 
     def matches(finder):
         return getattr(
-            finder, '__module__', None
-        ) == '_frozen_importlib_external' and hasattr(finder, 'find_distributions')
+            finder, "__module__", None
+        ) == "_frozen_importlib_external" and hasattr(finder, "find_distributions")
 
     for finder in filter(matches, sys.meta_path):  # pragma: nocover
         del finder.find_distributions
@@ -38,13 +47,21 @@ def disable_stdlib_finder():
 
 class NullFinder:
     """
-    A "Finder" (aka "MetaPathFinder") that never finds any modules,
+    A "Finder" (aka "MetaClassFinder") that never finds any modules,
     but may find distributions.
     """
 
     @staticmethod
     def find_spec(*args, **kwargs):
         return None
+
+    # In Python 2, the import system requires finders
+    # to have a find_module() method, but this usage
+    # is deprecated in Python 3 in favor of find_spec().
+    # For the purposes of this finder (i.e. being present
+    # on sys.meta_path but having no other import
+    # system functionality), the two methods are identical.
+    find_module = find_spec
 
 
 def pypy_partial(val):
@@ -53,5 +70,12 @@ def pypy_partial(val):
 
     Workaround for #327.
     """
-    is_pypy = platform.python_implementation() == 'PyPy'
+    is_pypy = platform.python_implementation() == "PyPy"
     return val + is_pypy
+
+
+if sys.version_info >= (3, 9):
+    StrPath = Union[str, os.PathLike[str]]
+else:
+    # PathLike is only subscriptable at runtime in 3.9+
+    StrPath = Union[str, "os.PathLike[str]"]  # pragma: no cover
